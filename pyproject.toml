@@ -1,0 +1,24 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"
+# `D:` = only set when the variable is not already defined in the environment.
+env = [
+    "D:DJANGO_SECRET_KEY=test-only-not-a-secret",
+    "D:POSTGRES_DB=hotel",
+    "D:POSTGRES_USER=hotel",
+    "D:POSTGRES_PASSWORD=hotel",
+    "D:POSTGRES_HOST=localhost",
+    "D:POSTGRES_PORT=5432",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ", "S", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"hotel/tests/*" = ["S101"]
+"hotel/migrations/*" = ["E501"]
