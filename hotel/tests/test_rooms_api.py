@@ -31,6 +31,17 @@ class TestRoomCreate:
         assert "label" in resp.json()
         assert Room.objects.count() == 1
 
+    def test_duplicate_label_race_is_400_not_500(self, api, make_room, monkeypatch):
+        """Lose the validator/insert race: the DB UNIQUE error must still become a 400."""
+        from rest_framework.validators import UniqueValidator
+
+        make_room(label="101")
+        monkeypatch.setattr(UniqueValidator, "__call__", lambda self, value, serializer_field: None)
+        resp = api.post(LIST_URL, payload(label="101"), format="json")
+        assert resp.status_code == 400
+        assert "label" in resp.json()
+        assert Room.objects.count() == 1
+
     @pytest.mark.parametrize("beds", [0, 6, -1, 100])
     def test_bed_count_out_of_range_rejected(self, api, beds):
         resp = api.post(LIST_URL, payload(number_of_beds=beds), format="json")

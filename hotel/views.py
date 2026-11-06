@@ -1,7 +1,8 @@
 """HTTP layer: parse, call the service, map domain errors to status codes."""
 
+from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
@@ -19,6 +20,25 @@ class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.order_by("id")
     serializer_class = RoomSerializer
     filterset_fields = ["number_of_beds", "view"]
+
+    def perform_create(self, serializer) -> None:
+        self._save(serializer)
+
+    def perform_update(self, serializer) -> None:
+        self._save(serializer)
+
+    @staticmethod
+    def _save(serializer) -> None:
+        # The serializer's uniqueness check is check-then-insert, so two simultaneous
+        # requests can both pass it; the UNIQUE constraint then decides. Report that as a
+        # normal validation error instead of a 500.
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except IntegrityError as exc:
+            raise serializers.ValidationError(
+                {"label": ["room with this label already exists."]}
+            ) from exc
 
     def perform_destroy(self, instance: Room) -> None:
         try:
