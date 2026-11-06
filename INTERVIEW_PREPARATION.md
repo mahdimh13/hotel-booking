@@ -10,7 +10,7 @@ document open. Each section points at real functions and tests.
 - [ ] Check `git log`: author name/e-mail must be yours, and the history should reflect how *you*
       actually worked. Do not hide that you used AI assistance; the assignment explicitly allows it.
 - [ ] Be able to break the code on purpose and watch the right test fail (see Q18).
-- [ ] Make sure `.env` is not committed (`git ls-files | grep env` should show only `.env.example`).
+- [ ] Make sure `.env` is not committed (`git ls-files | grep env` should show only `.env`).
 
 ---
 
@@ -390,7 +390,7 @@ by disabling the validator.
    service; know the adjacent vs overlapping cases.
 9. **`hotel/tests/test_booking_service.py`**: overlap matrix, deterministic selection, and the
    test comparing the range operator with the explicit `<`/`>` condition.
-10. **`docker-compose.yml` (+ `Dockerfile`, `.env.example`)**: health-checked DB before
+10. **`docker-compose.yml` (+ `Dockerfile`, `.env`)**: health-checked DB before
     migrations, no secrets in the repo, how to run tests in the container.
 
 **Drill:** open `services.py`, comment out the re-check, run

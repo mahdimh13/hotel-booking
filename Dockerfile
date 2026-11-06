@@ -4,6 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
+# Package index used by pip during the build (override via PIP_INDEX_URL in .env).
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 WORKDIR /app
 
 # Dev requirements are installed too so `docker compose run --rm web pytest` works.

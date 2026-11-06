@@ -17,7 +17,7 @@ DEBUG = _env_bool("DJANGO_DEBUG", False)
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY:
-    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set (see .env.example).")
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set (see .env).")
 
 ALLOWED_HOSTS = [
     h.strip()

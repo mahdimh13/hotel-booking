@@ -14,7 +14,10 @@ services:
       retries: 20
 
   web:
-    build: .
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     env_file: .env
     environment:
       POSTGRES_HOST: db

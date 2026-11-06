@@ -10,7 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, OperationalError, connection, transaction
 
 from hotel.models import Booking, Room
 from hotel.services import (
@@ -185,6 +185,17 @@ def test_constraint_stops_double_booking_even_without_locking(make_room):
             return Booking.objects.create(user_id=user, room=room, check_in=at(1), check_out=at(3))
 
     results = run_concurrently([lambda: naive_booking(1), lambda: naive_booking(2)])
-    assert sum(isinstance(r, Booking) for r in results) == 1
-    assert sum(isinstance(r, IntegrityError) for r in results) == 1
+    bookings = [r for r in results if isinstance(r, Booking)]
+    errors = [r for r in results if not isinstance(r, Booking)]
+    assert len(bookings) == 1, results
+    assert len(errors) == 1, results
+
+    # Two transactions inserting conflicting rows at once wait on each other. PostgreSQL
+    # resolves that either as an exclusion violation or by aborting one transaction as a
+    # deadlock victim (SQLSTATE 40P01). Either way the second booking is rejected.
+    err = errors[0]
+    if isinstance(err, OperationalError):
+        assert getattr(err.__cause__, "sqlstate", None) == "40P01", err
+    else:
+        assert isinstance(err, IntegrityError), err
     assert Booking.objects.count() == 1

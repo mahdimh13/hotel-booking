@@ -23,7 +23,7 @@ enforced by PostgreSQL itself, not only by application code.
 ### With Docker (recommended)
 
 ```bash
-cp .env.example .env        # then edit DJANGO_SECRET_KEY and POSTGRES_PASSWORD
+cp .env .env        # then edit DJANGO_SECRET_KEY and POSTGRES_PASSWORD
 docker compose up --build   # starts PostgreSQL, applies migrations, serves on :8000
 ```
 
@@ -42,7 +42,7 @@ creatable by the database user, which is the case for the database owner on Post
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env && set -a && source .env && set +a   # POSTGRES_HOST=localhost
+cp .env .env && set -a && source .env && set +a   # POSTGRES_HOST=localhost
 python manage.py migrate
 python manage.py runserver
 pytest
