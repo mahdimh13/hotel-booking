@@ -7,7 +7,8 @@ Concurrency strategy (details and proof sketch in README):
 2. **Coordination** - the chosen room row is locked with ``SELECT ... FOR UPDATE`` and the
    overlap is re-checked *after* the lock is held (a new statement, hence a fresh
    READ COMMITTED snapshot). Competing requests for the same room queue up and the
-   loser moves on to the next free room instead of failing.
+   loser releases the lock (rolls the attempt back) and moves on to the next free room
+   instead of failing. At most one room lock is held at a time, so no lock-order deadlock.
 """
 
 import logging
@@ -86,6 +87,10 @@ def _is_overlap_violation(exc: IntegrityError) -> bool:
     return getattr(diag, "constraint_name", None) == BOOKING_NO_OVERLAP_CONSTRAINT
 
 
+class _LostRace(Exception):
+    """Internal: the candidate room was taken between our query and our lock."""
+
+
 def create_booking(req: BookingRequest) -> Booking:
     """Book the first free matching room for [check_in, check_out).
 
@@ -95,9 +100,13 @@ def create_booking(req: BookingRequest) -> Booking:
     if req.check_out <= req.check_in:
         raise InvalidBookingPeriodError("check_out must be after check_in.")
 
-    try:
-        with transaction.atomic():
-            for _ in range(MAX_ALLOCATION_ATTEMPTS):
+    for _ in range(MAX_ALLOCATION_ATTEMPTS):
+        # One attempt = one transaction (or savepoint) holding at most ONE room lock.
+        # Losing a race rolls the attempt back, which releases that lock *before* we try
+        # the next room. Holding room A while waiting for room B is how two requests with
+        # different periods could deadlock, so we never do it.
+        try:
+            with transaction.atomic():
                 room = _lock_first_free_room(req)
                 if room is None:
                     raise NoRoomAvailableError(
@@ -106,10 +115,10 @@ def create_booking(req: BookingRequest) -> Booking:
 
                 # We now hold the room's row lock: anyone else booking this room is waiting
                 # for us. A new statement sees every booking committed before we got the
-                # lock, so this check is accurate. If it fails we lost a race; the next
+                # lock, so this check is accurate. If it fails, we lost a race; the next
                 # candidate query (fresh snapshot) will no longer return this room.
                 if _overlapping_bookings(req.check_in, req.check_out).filter(room=room).exists():
-                    continue
+                    raise _LostRace
 
                 return Booking.objects.create(
                     user_id=req.user_id,
@@ -117,12 +126,15 @@ def create_booking(req: BookingRequest) -> Booking:
                     check_in=req.check_in,
                     check_out=req.check_out,
                 )
-    except IntegrityError as exc:
-        if _is_overlap_violation(exc):
-            # Only reachable if the locking protocol was bypassed or the isolation level
-            # is stricter than READ COMMITTED; the database still refused the double booking.
-            logger.warning("Exclusion constraint rejected a booking: %s", exc)
-            raise BookingConflictError("The room was booked by a concurrent request.") from exc
-        raise
+        except _LostRace:
+            continue
+        except IntegrityError as exc:
+            if _is_overlap_violation(exc):
+                # Only reachable if the locking protocol was bypassed or the isolation level
+                # is stricter than READ COMMITTED; the database still refused the double
+                # booking.
+                logger.warning("Exclusion constraint rejected a booking: %s", exc)
+                raise BookingConflictError("The room was booked by a concurrent request.") from exc
+            raise
 
     raise BookingConflictError("Could not allocate a room under contention; please retry.")

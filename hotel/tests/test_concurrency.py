@@ -106,6 +106,25 @@ def test_mixed_overlapping_requests_never_double_book(make_room):
     assert_no_overlaps_in_db()
 
 
+def test_heavy_contention_no_errors_no_deadlocks(make_room):
+    """Many rooms, many overlapping periods, 40 simultaneous requests.
+
+    A deadlock would surface as OperationalError (PostgreSQL aborts one victim).
+    """
+    for _ in range(4):
+        make_room()
+    spans = [(1 + i % 6, 2 + i % 6 + i % 3) for i in range(40)]
+    results = run_concurrently(
+        [
+            lambda s=s, u=u: create_booking(request(at(s[0]), at(s[1]), user=u))
+            for u, s in enumerate(spans)
+        ]
+    )
+    assert all(isinstance(r, Booking | NoRoomAvailableError) for r in results), results
+    assert Booking.objects.count() == sum(isinstance(r, Booking) for r in results)
+    assert_no_overlaps_in_db()
+
+
 def test_waiter_rechecks_after_acquiring_the_room_lock(make_room):
     """Deterministic interleaving of the race the post-lock re-check exists for.
 
