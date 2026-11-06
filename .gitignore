@@ -7,3 +7,4 @@ venv/
 .ruff_cache/
 *.sqlite3
 staticfiles/
+INTERVIEW_PREPARATION.md
